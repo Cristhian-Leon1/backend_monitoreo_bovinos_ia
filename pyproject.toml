@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-v --tb=short"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+markers = [
+    "unit: marca tests como pruebas unitarias",
+    "integration: marca tests como pruebas de integración", 
+    "e2e: marca tests como pruebas end-to-end",
+    "slow: marca tests que tardan mucho en ejecutarse"
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning"
+]
+
+[project]
+name = "backend_monitoreo_bovinos_ia"
+version = "1.0.0"
+description = "Backend para sistema de monitoreo bovino con IA"
+authors = [{name = "Sistema de Monitoreo Bovino"}]
+dependencies = [
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
+    "supabase>=2.0.0",
+    "python-dotenv>=1.0.0",
+    "pydantic>=2.5.0",
+    "pydantic-settings>=2.1.0",
+    "python-multipart>=0.0.6",
+    "pillow>=9.5.0",
+    "aiofiles>=23.0.0",
+    "pytest>=6.0.0",
+    "pytest-asyncio>=0.21.0"
+]
