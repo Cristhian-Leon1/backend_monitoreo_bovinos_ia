@@ -259,12 +259,6 @@ El `.gitignore` está configurado para proteger:
 - **Bugs**: Usar la plantilla de bug report
 - **Características**: Usar la plantilla de feature request
 
-### Documentación Adicional
-
-- 📚 **[Wiki del Proyecto](https://github.com/Cristhian-Leon1/backend_monitoreo_bovinos_ia/wiki)**
-- 🔗 **[API Reference](http://localhost:8000/docs)** (servidor corriendo)
-- 📖 **[Guía de Desarrollo](docs/DEVELOPMENT.md)**
-
 ## 📄 Licencia
 
 Este proyecto está licenciado bajo la Licencia MIT - ver el archivo [LICENSE](LICENSE) para más detalles.

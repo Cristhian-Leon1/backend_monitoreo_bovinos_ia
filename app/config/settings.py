@@ -11,15 +11,20 @@ class Settings(BaseSettings):
     # Configuración de la aplicación
     app_name: str = "Monitoreo Bovinos IA Backend"
     app_version: str = "1.0.0"
-    debug: bool = True
+    debug: bool = False  # Cambiar a False para producción
     secret_key: str
     
     # Configuración del servidor
     host: str = "0.0.0.0"
-    port: int = 8000
+    port: int = int(os.getenv("PORT", 8000))  # Usar PORT de Render
     
-    # Configuración de CORS
-    cors_origins: List[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
+    # Configuración de CORS - Agregar dominio de Render
+    cors_origins: List[str] = [
+        "http://localhost:3000", 
+        "http://127.0.0.1:3000",
+        "https://*.onrender.com",  # Permitir dominios de Render
+        "https://monitoreo-bovinos-ia.onrender.com"  # Tu dominio específico
+    ]
     
     # Configuración del bucket
     bucket_name: str = "monitoreo_bovinos_IA"
