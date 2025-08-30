@@ -98,9 +98,19 @@ class AuthService:
         try:
             user_response = self.db.auth.get_user(access_token)
             if user_response.user:
-                return user_response.user
+                # Convertir el objeto User a diccionario
+                user_dict = {
+                    "id": user_response.user.id,
+                    "email": user_response.user.email,
+                    "created_at": str(user_response.user.created_at),
+                    "updated_at": str(user_response.user.updated_at),
+                    "user_metadata": user_response.user.user_metadata,
+                    "app_metadata": user_response.user.app_metadata
+                }
+                return user_dict
             return None
         except Exception as e:
+            print(f"Error verificando token: {str(e)}")
             return None
 
 # Instancia global del servicio
