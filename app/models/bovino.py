@@ -5,7 +5,7 @@ import uuid
 
 class BovinoBase(BaseModel):
     id_bovino: str = Field(..., min_length=1, max_length=50)
-    sexo: Optional[str] = Field(None, pattern="^[MH]$")
+    sexo: Optional[str] = Field(None, pattern="^(Macho|Hembra)$")
     raza: Optional[str] = Field(None, max_length=100)
 
 class BovinoCreate(BovinoBase):
@@ -13,7 +13,7 @@ class BovinoCreate(BovinoBase):
 
 class BovinoUpdate(BaseModel):
     id_bovino: Optional[str] = Field(None, min_length=1, max_length=50)
-    sexo: Optional[str] = Field(None, pattern="^[MH]$")
+    sexo: Optional[str] = Field(None, pattern="^(Macho|Hembra)$")
     raza: Optional[str] = Field(None, max_length=100)
 
 class BovinoResponse(BovinoBase):
