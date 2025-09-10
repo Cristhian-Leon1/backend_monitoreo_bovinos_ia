@@ -17,7 +17,9 @@ class BovinoService:
             if not finca_response.data:
                 raise Exception("Finca no encontrada o sin permisos")
             
+            # ✅ CORREGIR: Convertir UUID a string antes de insertar
             insert_data = bovino_data.dict()
+            insert_data['finca_id'] = str(insert_data['finca_id'])  # Convertir UUID a string
             
             response = self.db.table('bovinos').insert(insert_data).execute()
             

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 from typing import Optional, List, Any
 from datetime import datetime
 import uuid
@@ -17,8 +17,8 @@ class BovinoUpdate(BaseModel):
     raza: Optional[str] = Field(None, max_length=100)
 
 class BovinoResponse(BovinoBase):
-    id: uuid.UUID
-    finca_id: uuid.UUID
+    id: str  # ✅ CAMBIAR: De uuid.UUID a str
+    finca_id: str  # ✅ CAMBIAR: De uuid.UUID a str  
     created_at: datetime
     
     class Config:
