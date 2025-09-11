@@ -9,6 +9,16 @@ class MedicionService:
     def __init__(self, db_client: Client = supabase):
         self.db = db_client
     
+    def _convert_decimals_to_float(self, data: dict) -> dict:
+        """Convierte valores Decimal a float para evitar problemas de serialización"""
+        converted = {}
+        for key, value in data.items():
+            if isinstance(value, Decimal):
+                converted[key] = float(value)
+            else:
+                converted[key] = value
+        return converted
+    
     async def create_medicion(self, medicion_data: MedicionCreate, propietario_id: str) -> Dict[str, Any]:
         """Crea una nueva medición"""
         try:
@@ -18,34 +28,31 @@ class MedicionService:
             if not bovino_response.data or bovino_response.data[0]['fincas']['propietario_id'] != propietario_id:
                 raise Exception("Bovino no encontrado o sin permisos")
             
+            # Preparar datos para inserción
             insert_data = medicion_data.dict()
-            insert_data['fecha'] = str(insert_data['fecha'])  # Convertir fecha a string
+            
+            # Convertir fecha a string
+            insert_data['fecha'] = str(insert_data['fecha'])
+            
+            # Convertir Decimals a float para evitar problemas de serialización
+            insert_data = self._convert_decimals_to_float(insert_data)
+            
+            # Convertir UUID a string
+            insert_data['bovino_id'] = str(insert_data['bovino_id'])
             
             response = self.db.table('mediciones_bovinos').insert(insert_data).execute()
             
             if response.data:
-                return response.data[0]
+                # Convertir la respuesta también
+                result = response.data[0]
+                return self._convert_decimals_to_float(result)
             else:
                 raise Exception("Error creando medición")
                 
         except Exception as e:
             raise Exception(f"Error creando medición: {str(e)}")
     
-    async def get_mediciones_by_bovino(self, bovino_id: str, propietario_id: str) -> List[Dict[str, Any]]:
-        """Obtiene todas las mediciones de un bovino"""
-        try:
-            # Verificar permisos
-            bovino_response = self.db.table('bovinos').select('*, fincas!inner(propietario_id)').eq('id', bovino_id).execute()
-            
-            if not bovino_response.data or bovino_response.data[0]['fincas']['propietario_id'] != propietario_id:
-                raise Exception("Bovino no encontrado o sin permisos")
-            
-            response = self.db.table('mediciones_bovinos').select('*').eq('bovino_id', bovino_id).order('fecha', desc=True).execute()
-            return response.data if response.data else []
-            
-        except Exception as e:
-            raise Exception(f"Error obteniendo mediciones: {str(e)}")
-    
+
     async def get_medicion_by_id(self, medicion_id: str, propietario_id: str) -> Optional[Dict[str, Any]]:
         """Obtiene una medición específica"""
         try:

@@ -3,6 +3,7 @@ from typing import Optional
 from datetime import datetime, date
 from decimal import Decimal
 import uuid
+import json
 
 class MedicionBase(BaseModel):
     fecha: date
@@ -34,3 +35,10 @@ class MedicionResponse(MedicionBase):
     
     class Config:
         from_attributes = True
+        # Agregar configuración para manejar Decimals
+        json_encoders = {
+            Decimal: lambda v: float(v) if v is not None else None,
+            datetime: lambda v: v.isoformat() if v is not None else None,
+            date: lambda v: v.isoformat() if v is not None else None,
+            uuid.UUID: lambda v: str(v) if v is not None else None,
+        }
