@@ -3,6 +3,7 @@ from app.config.database import supabase
 from app.models.medicion import MedicionCreate, MedicionUpdate
 from typing import List, Dict, Any, Optional
 from datetime import date
+from decimal import Decimal
 import uuid
 
 class MedicionService:
