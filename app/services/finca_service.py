@@ -1,7 +1,8 @@
 from supabase import Client
 from app.config.database import supabase
-from app.models.finca import FincaCreate, FincaUpdate
+from app.models.finca import FincaCreate, FincaUpdate, FincaWithBovinosAndMediciones, BovinoWithLastMedicion
 from typing import List, Dict, Any, Optional
+from datetime import datetime
 import uuid
 
 class FincaService:
@@ -90,6 +91,86 @@ class FincaService:
             
         except Exception as e:
             raise Exception(f"Error obteniendo finca con bovinos: {str(e)}")
+
+    async def get_finca_with_bovinos_and_mediciones(self, finca_id: str, propietario_id: str) -> Optional[FincaWithBovinosAndMediciones]:
+        """
+        Obtiene una finca con todos sus bovinos y la última medición de cada uno
+        """
+        try:
+            # Obtener datos de la finca
+            finca_response = self.db.table('fincas')\
+                .select('*')\
+                .eq('id', finca_id)\
+                .eq('propietario_id', propietario_id)\
+                .execute()
+            
+            if not finca_response.data:
+                return None
+            
+            finca_data = finca_response.data[0]
+            
+            # Obtener bovinos de la finca
+            bovinos_response = self.db.table('bovinos')\
+                .select('*')\
+                .eq('finca_id', finca_id)\
+                .execute()
+            
+            bovinos_with_mediciones = []
+            bovinos_con_mediciones_recientes = 0
+            
+            for bovino_data in bovinos_response.data:
+                # Obtener la última medición de cada bovino
+                medicion_response = self.db.table('mediciones')\
+                    .select('*')\
+                    .eq('bovino_id', bovino_data['id'])\
+                    .order('fecha', desc=True)\
+                    .limit(1)\
+                    .execute()
+                
+                ultima_medicion = None
+                if medicion_response.data:
+                    ultima_medicion = medicion_response.data[0]
+                    # Considerar medición reciente si es de los últimos 30 días
+                    try:
+                        fecha_medicion_str = ultima_medicion['fecha']
+                        if isinstance(fecha_medicion_str, str):
+                            # La fecha viene como string "YYYY-MM-DD"
+                            from datetime import date
+                            fecha_medicion = datetime.strptime(fecha_medicion_str, '%Y-%m-%d').date()
+                            fecha_actual = datetime.now().date()
+                            dias_diferencia = (fecha_actual - fecha_medicion).days
+                        else:
+                            # La fecha ya es un objeto date
+                            fecha_actual = datetime.now().date()
+                            dias_diferencia = (fecha_actual - fecha_medicion_str).days
+                        
+                        if dias_diferencia <= 30:
+                            bovinos_con_mediciones_recientes += 1
+                    except Exception as e:
+                        # Si hay error parseando fecha, no cuenta como reciente
+                        print(f"Error parseando fecha de medición: {e}")
+                        pass
+                
+                # Crear objeto bovino con última medición
+                bovino_with_medicion = BovinoWithLastMedicion(
+                    **bovino_data,
+                    ultima_medicion=ultima_medicion
+                )
+                bovinos_with_mediciones.append(bovino_with_medicion)
+            
+            # Crear objeto finca completo
+            finca_completa = FincaWithBovinosAndMediciones(
+                **finca_data,
+                bovinos=bovinos_with_mediciones,
+                total_bovinos=len(bovinos_with_mediciones),
+                bovinos_con_mediciones_recientes=bovinos_con_mediciones_recientes
+            )
+            
+            return finca_completa
+            
+        except Exception as e:
+            print(f"Error al obtener finca con bovinos y mediciones: {e}")
+            raise Exception(f"Error al obtener datos completos de la finca: {str(e)}")
 
 # Instancia global del servicio
 finca_service = FincaService()

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, status, Depends
-from app.models.finca import FincaCreate, FincaUpdate, FincaResponse, FincaWithBovinos
+from app.models.finca import FincaCreate, FincaUpdate, FincaResponse, FincaWithBovinos, FincaWithBovinosAndMediciones
 from app.services.finca_service import finca_service
 from app.middleware.auth import get_current_user_id
 from typing import List
@@ -112,6 +112,7 @@ async def delete_finca(
         )
 
 @router.get("/{finca_id}/with-bovinos", response_model=FincaWithBovinos)
+@router.get("/{finca_id}/with-bovinos", response_model=FincaWithBovinos)
 async def get_finca_with_bovinos(
     finca_id: str,
     current_user_id: str = Depends(get_current_user_id)
@@ -129,6 +130,33 @@ async def get_finca_with_bovinos(
             )
         
         return finca
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+@router.get("/{finca_id}/complete", response_model=FincaWithBovinosAndMediciones)
+async def get_finca_complete(
+    finca_id: str,
+    current_user_id: str = Depends(get_current_user_id)
+):
+    """
+    Obtiene una finca completa con todos sus bovinos y la última medición de cada uno
+    """
+    try:
+        finca_completa = await finca_service.get_finca_with_bovinos_and_mediciones(finca_id, current_user_id)
+        
+        if not finca_completa:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Finca no encontrada"
+            )
+        
+        return finca_completa
     
     except HTTPException:
         raise
