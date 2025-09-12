@@ -120,7 +120,7 @@ class FincaService:
             
             for bovino_data in bovinos_response.data:
                 # Obtener la última medición de cada bovino
-                medicion_response = self.db.table('mediciones')\
+                medicion_response = self.db.table('mediciones_bovinos')\
                     .select('*')\
                     .eq('bovino_id', bovino_data['id'])\
                     .order('fecha', desc=True)\

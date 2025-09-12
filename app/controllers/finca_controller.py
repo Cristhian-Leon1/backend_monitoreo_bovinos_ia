@@ -112,7 +112,6 @@ async def delete_finca(
         )
 
 @router.get("/{finca_id}/with-bovinos", response_model=FincaWithBovinos)
-@router.get("/{finca_id}/with-bovinos", response_model=FincaWithBovinos)
 async def get_finca_with_bovinos(
     finca_id: str,
     current_user_id: str = Depends(get_current_user_id)
