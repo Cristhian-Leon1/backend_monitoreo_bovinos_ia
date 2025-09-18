@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, status, Depends, UploadFile, File, Form
-from app.models.common import ImageUploadResponse, BulkUploadResponse
+from app.models.common import ImageUploadResponse, BulkUploadResponse, ProfileImageUploadRequest, ProfileImageUploadResponse
 from app.services.image_service import image_service
 from app.middleware.auth import get_current_user_id
 from typing import List, Optional
@@ -158,4 +158,26 @@ async def list_images_in_folder(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error listando imágenes: {str(e)}"
+        )
+
+@router.post("/upload-profile", response_model=ProfileImageUploadResponse)
+async def upload_profile_image(
+    request: ProfileImageUploadRequest,
+    current_user_id: str = Depends(get_current_user_id)
+):
+    """
+    Sube una imagen de perfil desde base64 y actualiza la tabla perfiles
+    """
+    try:
+        result = await image_service.upload_profile_image_base64(
+            image_base64=request.image_base64,
+            user_id=current_user_id,
+            file_name=request.file_name
+        )
+        return result
+    
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
         )
