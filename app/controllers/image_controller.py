@@ -1,164 +1,9 @@
-from fastapi import APIRouter, HTTPException, status, Depends, UploadFile, File, Form
-from app.models.common import ImageUploadResponse, BulkUploadResponse, ProfileImageUploadRequest, ProfileImageUploadResponse
+from fastapi import APIRouter, HTTPException, status, Depends
+from app.models.common import  ProfileImageUploadRequest, ProfileImageUploadResponse
 from app.services.image_service import image_service
 from app.middleware.auth import get_current_user_id
-from typing import List, Optional
-import uuid
 
 router = APIRouter(prefix="/images", tags=["Imágenes"])
-
-@router.post("/upload", response_model=ImageUploadResponse)
-async def upload_image(
-    file: UploadFile = File(...),
-    folder: str = Form("bovinos"),
-    current_user_id: str = Depends(get_current_user_id)
-):
-    """
-    Sube una imagen al bucket de almacenamiento
-    """
-    try:
-        # Validar tipo de archivo
-        allowed_types = ["image/jpeg", "image/png", "image/jpg", "image/webp"]
-        if file.content_type not in allowed_types:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Tipo de archivo no permitido. Tipos válidos: {', '.join(allowed_types)}"
-            )
-        
-        # Validar tamaño (máximo 10MB)
-        max_size = 10 * 1024 * 1024  # 10MB
-        file_content = await file.read()
-        if len(file_content) > max_size:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="El archivo es demasiado grande. Máximo 10MB"
-            )
-        
-        # Resetear el archivo para la subida
-        await file.seek(0)
-        
-        result = await image_service.upload_image(file, folder)
-        return result
-    
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error subiendo imagen: {str(e)}"
-        )
-
-@router.post("/upload-multiple", response_model=BulkUploadResponse)
-async def upload_multiple_images(
-    files: List[UploadFile] = File(...),
-    folder: str = Form("bovinos"),
-    current_user_id: str = Depends(get_current_user_id)
-):
-    """
-    Sube múltiples imágenes al bucket de almacenamiento
-    """
-    try:
-        # Validar cantidad de archivos
-        max_files = 20
-        if len(files) > max_files:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Máximo {max_files} archivos permitidos"
-            )
-        
-        # Validar cada archivo
-        allowed_types = ["image/jpeg", "image/png", "image/jpg", "image/webp"]
-        max_size = 10 * 1024 * 1024  # 10MB
-        
-        for file in files:
-            if file.content_type not in allowed_types:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Archivo {file.filename}: tipo no permitido"
-                )
-            
-            file_content = await file.read()
-            if len(file_content) > max_size:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Archivo {file.filename}: demasiado grande (máximo 10MB)"
-                )
-            
-            await file.seek(0)  # Resetear para la subida
-        
-        result = await image_service.upload_multiple_images(files, folder)
-        return result
-    
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error subiendo imágenes: {str(e)}"
-        )
-
-@router.delete("/{file_path:path}")
-async def delete_image(
-    file_path: str,
-    current_user_id: str = Depends(get_current_user_id)
-):
-    """
-    Elimina una imagen del bucket de almacenamiento
-    """
-    try:
-        deleted = await image_service.delete_image(file_path)
-        
-        if not deleted:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Imagen no encontrada"
-            )
-        
-        return {"message": "Imagen eliminada exitosamente"}
-    
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error eliminando imagen: {str(e)}"
-        )
-
-@router.get("/url/{file_path:path}")
-async def get_image_url(
-    file_path: str,
-    current_user_id: str = Depends(get_current_user_id)
-):
-    """
-    Obtiene la URL pública de una imagen
-    """
-    try:
-        url = await image_service.get_image_url(file_path)
-        return {"public_url": url}
-    
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error obteniendo URL: {str(e)}"
-        )
-
-@router.get("/list/{folder}")
-async def list_images_in_folder(
-    folder: str,
-    current_user_id: str = Depends(get_current_user_id)
-):
-    """
-    Lista todas las imágenes en una carpeta específica
-    """
-    try:
-        images = await image_service.list_images_in_folder(folder)
-        return {"images": images}
-    
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error listando imágenes: {str(e)}"
-        )
 
 @router.post("/upload-profile", response_model=ProfileImageUploadResponse)
 async def upload_profile_image(
@@ -169,14 +14,60 @@ async def upload_profile_image(
     Sube una imagen de perfil desde base64 y actualiza la tabla perfiles
     """
     try:
+        print("🚀 === INICIO UPLOAD IMAGEN PERFIL ===")
+        print(f"👤 Usuario autenticado: {current_user_id}")
+        print(f"📝 Tipo de request: {type(request)}")
+        print(f"📄 Archivo especificado: {request.file_name}")
+        
+        # Validar que image_base64 existe y tiene contenido
+        if not hasattr(request, 'image_base64') or not request.image_base64:
+            print("❌ ERROR: No se recibió image_base64 o está vacío")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="El campo image_base64 es requerido y no puede estar vacío"
+            )
+        
+        # Logs sobre el contenido base64
+        image_b64_length = len(request.image_base64)
+        print(f"📏 Longitud de image_base64: {image_b64_length} caracteres")
+        
+        # Verificar que comience con data:image/
+        if request.image_base64.startswith('data:image/'):
+            header_part = request.image_base64.split(',')[0] if ',' in request.image_base64 else request.image_base64[:50]
+            print(f"✅ Header base64 correcto: {header_part}")
+        else:
+            print(f"❌ Header base64 incorrecto. Primeros 50 chars: {request.image_base64[:50]}")
+        
+        # Verificar que tenga la coma separadora
+        if ',' not in request.image_base64:
+            print("❌ ERROR: Falta la coma separadora en el base64")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Formato base64 inválido: falta la coma separadora después del header"
+            )
+        
+        print("📤 Enviando a servicio de imagen...")
+        
         result = await image_service.upload_profile_image_base64(
             image_base64=request.image_base64,
             user_id=current_user_id,
             file_name=request.file_name
         )
+        
+        print("✅ Imagen subida exitosamente")
+        print(f"🔗 URL generada: {result['public_url']}")
+        print("🚀 === FIN UPLOAD IMAGEN PERFIL ===")
+        
         return result
     
+    except HTTPException as http_ex:
+        print(f"❌ HTTPException capturada: {http_ex.detail}")
+        print("🚀 === FIN UPLOAD IMAGEN PERFIL (ERROR HTTP) ===")
+        raise
     except Exception as e:
+        print(f"❌ Exception general capturada: {str(e)}")
+        print(f"🔍 Tipo de error: {type(e).__name__}")
+        print("🚀 === FIN UPLOAD IMAGEN PERFIL (ERROR GENERAL) ===")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)

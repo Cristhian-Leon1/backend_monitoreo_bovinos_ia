@@ -34,7 +34,10 @@ async def get_current_user_id(current_user: Dict[str, Any] = Depends(get_current
     """
     Obtiene solo el ID del usuario actual
     """
-    return current_user.get("id")
+    user_id = current_user.get("id")
+    print(f"🔐 AUTH: Usuario autenticado ID: {user_id}")
+    print(f"🔍 AUTH: Datos completos usuario: {current_user}")
+    return user_id
 
 class AuthMiddleware:
     """

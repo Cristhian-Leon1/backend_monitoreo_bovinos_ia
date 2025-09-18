@@ -14,7 +14,8 @@ http_client = httpx.Client(verify=False)
 
 # Opciones del cliente
 client_options = ClientOptions(
-    httpx_client=http_client
+    httpx_client=http_client,
+    schema="public"
 )
 
 # Cliente de Supabase
@@ -24,9 +25,12 @@ try:
         settings.supabase_anon_key,
         options=client_options
     )
+    print(f"✅ Cliente Supabase creado exitosamente")
+    print(f"   URL base: {settings.supabase_url}")
+    print(f"   Storage endpoint: {settings.supabase_url}/storage/v1")
 except Exception as e:
     print(f"Error creando cliente Supabase: {e}")
-    # Fallback sin opciones
+    # Fallback sin opciones específicas
     supabase: Client = create_client(
         settings.supabase_url,
         settings.supabase_anon_key
@@ -39,9 +43,10 @@ try:
         settings.supabase_service_role_key,
         options=client_options
     )
+    print(f"✅ Cliente Supabase admin creado exitosamente")
 except Exception as e:
     print(f"Error creando cliente Supabase admin: {e}")
-    # Fallback sin opciones
+    # Fallback sin opciones específicas
     supabase_admin: Client = create_client(
         settings.supabase_url,
         settings.supabase_service_role_key

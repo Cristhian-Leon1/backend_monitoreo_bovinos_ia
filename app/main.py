@@ -70,6 +70,66 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Middleware para logging de peticiones a upload-profile
+@app.middleware("http")
+async def log_upload_profile_requests(request: Request, call_next):
+    """Middleware temporal para debugging de upload-profile"""
+    
+    # Solo loggear peticiones a upload-profile
+    if "/images/upload-profile" in str(request.url):
+        print(f"🌐 === MIDDLEWARE: Petición recibida ===")
+        print(f"📍 URL: {request.url}")
+        print(f"🔧 Método: {request.method}")
+        print(f"📋 Headers: {dict(request.headers)}")
+        
+        # Leer el body si es POST
+        if request.method == "POST":
+            try:
+                # Obtener el body raw
+                body = await request.body()
+                print(f"📦 Body size: {len(body)} bytes")
+                
+                # Intentar parsear como JSON
+                if body:
+                    try:
+                        import json
+                        body_json = json.loads(body.decode())
+                        print(f"📝 Body JSON keys: {list(body_json.keys()) if isinstance(body_json, dict) else 'Not dict'}")
+                        
+                        # Si hay image_base64, mostrar info sobre él
+                        if isinstance(body_json, dict) and 'image_base64' in body_json:
+                            b64_data = body_json['image_base64']
+                            print(f"📷 image_base64 length: {len(b64_data)}")
+                            print(f"📷 image_base64 starts with: {b64_data[:50]}...")
+                            
+                            if 'file_name' in body_json:
+                                print(f"📄 file_name: {body_json['file_name']}")
+                        else:
+                            print("❌ No se encontró 'image_base64' en el body JSON")
+                            
+                    except json.JSONDecodeError as e:
+                        print(f"❌ Error parseando JSON: {e}")
+                        print(f"📝 Body raw (primeros 200 chars): {body.decode()[:200]}...")
+                    except Exception as e:
+                        print(f"❌ Error general parseando body: {e}")
+                        
+                # Recrear el request con el body
+                from starlette.requests import Request as StarletteRequest
+                
+                async def receive():
+                    return {"type": "http.request", "body": body}
+                
+                request._receive = receive
+                
+            except Exception as e:
+                print(f"❌ Error leyendo body: {e}")
+        
+        print(f"🌐 === MIDDLEWARE: Fin logging ===")
+    
+    # Continuar con la petición
+    response = await call_next(request)
+    return response
+
 # Manejadores de errores globales ACTUALIZADOS
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
