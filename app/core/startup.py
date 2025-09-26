@@ -105,10 +105,10 @@ async def check_models():
     try:
         print_info("Verificando modelos de datos...")
         
-        from app.models.auth import PerfilResponse
-        from app.models.finca import FincaResponse
-        from app.models.bovino import BovinoResponse
-        from app.models.medicion import MedicionResponse
+        from app.models.auth_models import PerfilResponse
+        from app.models.finca_models import FincaResponse
+        from app.models.bovino_models import BovinoResponse
+        from app.models.medicion_models import MedicionResponse
         
         print_status("Modelo Perfil: OK")
         print_status("Modelo Finca: OK")
@@ -116,7 +116,7 @@ async def check_models():
         print_status("Modelo Medicion: OK")
         
         # Resolver referencias
-        from app.models.resolver import resolve_model_references
+        from app.models.resolver_models import resolve_model_references
         resolve_model_references()
         print_status("Referencias de modelos: Resueltas")
         
@@ -131,7 +131,7 @@ async def check_routes():
     try:
         print_info("Verificando rutas de la API...")
         
-        from app.views.api import api_router
+        from app.views.api_router import api_router
         
         route_count = len(api_router.routes)
         if route_count > 0:

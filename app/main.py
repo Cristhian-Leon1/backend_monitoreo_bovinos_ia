@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from fastapi.encoders import jsonable_encoder
 from app.config.settings import settings
-from app.views.api import api_router
+from app.views.api_router import api_router
 from app.core.startup import startup_checks, print_status, print_info
 import logging
 import time

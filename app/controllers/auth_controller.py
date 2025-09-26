@@ -1,130 +1,117 @@
-from fastapi import APIRouter, HTTPException, status, Depends
-from app.models.auth import UserRegister, UserLogin, TokenResponse, PerfilUpdate, PerfilResponse
-from app.services.auth_service import auth_service
-from app.middleware.auth import get_current_user, get_current_user_id
-from typing import Dict, Any
+from supabase import Client
+from app.config.database import supabase, supabase_admin
+from app.models.auth_models import UserRegister, UserLogin, PerfilCreate, PerfilUpdate
+from typing import Optional, Dict, Any
+import uuid
 
-router = APIRouter(prefix="/auth", tags=["Autenticación"])
-
-@router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
-async def register(user_data: UserRegister):
-    """
-    Registra un nuevo usuario en el sistema
-    """
-    try:
-        result = await auth_service.register_user(user_data)
-        
-        user_response = {
-            "id": result["user"].id,
-            "email": result["user"].email,
-            "created_at": result["user"].created_at
-        }
-        
-        return TokenResponse(
-            access_token=result["session"].access_token,
-            refresh_token=result["session"].refresh_token,
-            expires_in=result["session"].expires_in,
-            user=user_response
-        )
+class AuthController:
+    def __init__(self, db_client: Client = supabase):
+        self.db = db_client
+        self.admin_db = supabase_admin
     
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
-        )
-
-@router.post("/login", response_model=TokenResponse)
-async def login(user_data: UserLogin):
-    """
-    Autentica un usuario y devuelve tokens de acceso
-    """
-    try:
-        result = await auth_service.login_user(user_data)
-        
-        user_response = {
-            "id": result["user"].id,
-            "email": result["user"].email,
-            "created_at": result["user"].created_at,
-            "perfil": result["perfil"]
-        }
-        
-        return TokenResponse(
-            access_token=result["session"].access_token,
-            refresh_token=result["session"].refresh_token,
-            expires_in=result["session"].expires_in,
-            user=user_response
-        )
+    async def register_user(self, user_data: UserRegister) -> Dict[str, Any]:
+        """Registra un nuevo usuario"""
+        try:
+            # Registrar usuario en Supabase Auth
+            auth_response = self.db.auth.sign_up({
+                "email": user_data.email,
+                "password": user_data.password,
+                "options": {
+                    "data": {
+                        "nombre_completo": user_data.nombre_completo
+                    }
+                }
+            })
+            
+            if auth_response.user:
+                return {
+                    "user": auth_response.user,
+                    "session": auth_response.session
+                }
+            else:
+                raise Exception("Error al registrar usuario")
+                
+        except Exception as e:
+            raise Exception(f"Error en registro: {str(e)}")
     
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=str(e)
-        )
-
-@router.post("/logout")
-async def logout(current_user: Dict[str, Any] = Depends(get_current_user)):
-    """
-    Cierra la sesión del usuario actual
-    """
-    try:
-        await auth_service.logout_user("")
-        return {"message": "Sesión cerrada exitosamente"}
+    async def login_user(self, user_data: UserLogin) -> Dict[str, Any]:
+        """Autentica un usuario"""
+        try:
+            auth_response = self.db.auth.sign_in_with_password({
+                "email": user_data.email,
+                "password": user_data.password
+            })
+            
+            if auth_response.user and auth_response.session:
+                # Obtener perfil del usuario
+                perfil = await self.get_user_profile(auth_response.user.id)
+                
+                return {
+                    "user": auth_response.user,
+                    "session": auth_response.session,
+                    "perfil": perfil
+                }
+            else:
+                raise Exception("Credenciales inválidas")
+                
+        except Exception as e:
+            raise Exception(f"Error en login: {str(e)}")
     
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
-        )
-
-@router.get("/me", response_model=PerfilResponse)
-async def get_current_user_profile(user_id: str = Depends(get_current_user_id)):
-    """
-    Obtiene el perfil del usuario actual
-    """
-    try:
-        perfil = await auth_service.get_user_profile(user_id)
-        
-        if not perfil:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Perfil no encontrado"
-            )
-        
-        return perfil
+    async def get_user_profile(self, user_id: str) -> Optional[Dict[str, Any]]:
+        """Obtiene el perfil de un usuario"""
+        try:
+            response = self.db.table('perfiles').select('*').eq('id', user_id).execute()
+            
+            if response.data:
+                return response.data[0]
+            return None
+            
+        except Exception as e:
+            raise Exception(f"Error obteniendo perfil: {str(e)}")
     
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
-        )
-
-@router.put("/me", response_model=PerfilResponse)
-async def update_current_user_profile(
-    profile_data: PerfilUpdate,
-    user_id: str = Depends(get_current_user_id)
-):
-    """
-    Actualiza el perfil del usuario actual
-    """
-    try:
-        updated_profile = await auth_service.update_user_profile(user_id, profile_data)
-        return updated_profile
+    async def update_user_profile(self, user_id: str, profile_data: PerfilUpdate) -> Dict[str, Any]:
+        """Actualiza el perfil de un usuario"""
+        try:
+            update_data = profile_data.dict(exclude_unset=True)
+            update_data['updated_at'] = 'now()'
+            
+            response = self.db.table('perfiles').update(update_data).eq('id', user_id).execute()
+            
+            if response.data:
+                return response.data[0]
+            else:
+                raise Exception("Error actualizando perfil")
+                
+        except Exception as e:
+            raise Exception(f"Error actualizando perfil: {str(e)}")
     
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
-        )
+    async def logout_user(self, access_token: str) -> bool:
+        """Cierra sesión de usuario"""
+        try:
+            self.db.auth.sign_out()
+            return True
+        except Exception as e:
+            raise Exception(f"Error en logout: {str(e)}")
+    
+    async def verify_token(self, access_token: str) -> Optional[Dict[str, Any]]:
+        """Verifica un token de acceso"""
+        try:
+            user_response = self.db.auth.get_user(access_token)
+            if user_response.user:
+                # Convertir el objeto User a diccionario
+                user_dict = {
+                    "id": user_response.user.id,
+                    "email": user_response.user.email,
+                    "created_at": str(user_response.user.created_at),
+                    "updated_at": str(user_response.user.updated_at),
+                    "user_metadata": user_response.user.user_metadata,
+                    "app_metadata": user_response.user.app_metadata
+                }
+                return user_dict
+            return None
+        except Exception as e:
+            print(f"Error verificando token: {str(e)}")
+            return None
 
-@router.get("/verify")
-async def verify_token(current_user: Dict[str, Any] = Depends(get_current_user)):
-    """
-    Verifica si el token actual es válido
-    """
-    return {
-        "valid": True,
-        "user_id": current_user.get("id"),
-        "email": current_user.get("email")
-    }
+# Instancia global del controlador
+auth_controller = AuthController()

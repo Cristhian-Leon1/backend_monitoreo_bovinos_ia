@@ -1,160 +1,129 @@
-from fastapi import APIRouter, HTTPException, status, Depends, Query
-from app.models.bovino import BovinoCreate, BovinoUpdate, BovinoResponse, BovinoWithMediciones
-from app.services.bovino_service import bovino_service
-from app.middleware.auth import get_current_user_id
-from typing import List, Optional
+from supabase import Client
+from app.config.database import supabase
+from app.models.bovino_models import BovinoCreate, BovinoUpdate
+from typing import List, Dict, Any, Optional
 import uuid
 
-router = APIRouter(prefix="/bovinos", tags=["Bovinos"])
-
-@router.post("/", response_model=BovinoResponse, status_code=status.HTTP_201_CREATED)
-async def create_bovino(
-    bovino_data: BovinoCreate,
-    current_user_id: str = Depends(get_current_user_id)
-):
-    """
-    Crea un nuevo bovino en una finca del usuario actual
-    """
-    try:
-        bovino = await bovino_service.create_bovino(bovino_data, current_user_id)
-        return bovino
+class BovinoController:
+    def __init__(self, db_client: Client = supabase):
+        self.db = db_client
     
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
-        )
-
-@router.get("/finca/{finca_id}", response_model=List[BovinoResponse])
-async def get_bovinos_by_finca(
-    finca_id: str,
-    current_user_id: str = Depends(get_current_user_id)
-):
-    """
-    Obtiene todos los bovinos de una finca específica
-    """
-    try:
-        bovinos = await bovino_service.get_bovinos_by_finca(finca_id, current_user_id)
-        return bovinos
+    async def create_bovino(self, bovino_data: BovinoCreate, propietario_id: str) -> Dict[str, Any]:
+        """Crea un nuevo bovino"""
+        try:
+            # Verificar que la finca pertenece al usuario
+            finca_response = self.db.table('fincas').select('id').eq('id', str(bovino_data.finca_id)).eq('propietario_id', propietario_id).execute()
+            
+            if not finca_response.data:
+                raise Exception("Finca no encontrada o sin permisos")
+            
+            # ✅ CORREGIR: Convertir UUID a string antes de insertar
+            insert_data = bovino_data.dict()
+            insert_data['finca_id'] = str(insert_data['finca_id'])  # Convertir UUID a string
+            
+            response = self.db.table('bovinos').insert(insert_data).execute()
+            
+            if response.data:
+                return response.data[0]
+            else:
+                raise Exception("Error creando bovino")
+                
+        except Exception as e:
+            raise Exception(f"Error creando bovino: {str(e)}")
     
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
-        )
-
-@router.get("/{bovino_id}", response_model=BovinoResponse)
-async def get_bovino_by_id(
-    bovino_id: str,
-    current_user_id: str = Depends(get_current_user_id)
-):
-    """
-    Obtiene un bovino específico del usuario actual
-    """
-    try:
-        bovino = await bovino_service.get_bovino_by_id(bovino_id, current_user_id)
-        
-        if not bovino:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Bovino no encontrado"
-            )
-        
-        return bovino
+    async def get_bovinos_by_finca(self, finca_id: str, propietario_id: str) -> List[Dict[str, Any]]:
+        """Obtiene todos los bovinos de una finca"""
+        try:
+            # Verificar permisos
+            finca_response = self.db.table('fincas').select('id').eq('id', finca_id).eq('propietario_id', propietario_id).execute()
+            
+            if not finca_response.data:
+                raise Exception("Finca no encontrada o sin permisos")
+            
+            response = self.db.table('bovinos').select('*').eq('finca_id', finca_id).execute()
+            return response.data if response.data else []
+            
+        except Exception as e:
+            raise Exception(f"Error obteniendo bovinos: {str(e)}")
     
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
-        )
-
-@router.put("/{bovino_id}", response_model=BovinoResponse)
-async def update_bovino(
-    bovino_id: str,
-    bovino_data: BovinoUpdate,
-    current_user_id: str = Depends(get_current_user_id)
-):
-    """
-    Actualiza un bovino del usuario actual
-    """
-    try:
-        updated_bovino = await bovino_service.update_bovino(bovino_id, bovino_data, current_user_id)
-        return updated_bovino
+    async def get_bovino_by_id(self, bovino_id: str, propietario_id: str) -> Optional[Dict[str, Any]]:
+        """Obtiene un bovino específico"""
+        try:
+            response = self.db.table('bovinos').select('*, fincas!inner(propietario_id)').eq('id', bovino_id).execute()
+            
+            if response.data and response.data[0]['fincas']['propietario_id'] == propietario_id:
+                return response.data[0]
+            return None
+            
+        except Exception as e:
+            raise Exception(f"Error obteniendo bovino: {str(e)}")
     
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
-        )
-
-@router.delete("/{bovino_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_bovino(
-    bovino_id: str,
-    current_user_id: str = Depends(get_current_user_id)
-):
-    """
-    Elimina un bovino del usuario actual
-    """
-    try:
-        deleted = await bovino_service.delete_bovino(bovino_id, current_user_id)
-        
-        if not deleted:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Bovino no encontrado"
-            )
+    async def update_bovino(self, bovino_id: str, bovino_data: BovinoUpdate, propietario_id: str) -> Dict[str, Any]:
+        """Actualiza un bovino"""
+        try:
+            # Verificar permisos
+            bovino_actual = await self.get_bovino_by_id(bovino_id, propietario_id)
+            if not bovino_actual:
+                raise Exception("Bovino no encontrado o sin permisos")
+            
+            update_data = bovino_data.dict(exclude_unset=True)
+            
+            response = self.db.table('bovinos').update(update_data).eq('id', bovino_id).execute()
+            
+            if response.data:
+                return response.data[0]
+            else:
+                raise Exception("Error actualizando bovino")
+                
+        except Exception as e:
+            raise Exception(f"Error actualizando bovino: {str(e)}")
     
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
-        )
-
-@router.get("/{bovino_id}/with-mediciones", response_model=BovinoWithMediciones)
-async def get_bovino_with_mediciones(
-    bovino_id: str,
-    current_user_id: str = Depends(get_current_user_id)
-):
-    """
-    Obtiene un bovino con todas sus mediciones
-    """
-    try:
-        bovino = await bovino_service.get_bovino_with_mediciones(bovino_id, current_user_id)
-        
-        if not bovino:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Bovino no encontrado"
-            )
-        
-        return bovino
+    async def delete_bovino(self, bovino_id: str, propietario_id: str) -> bool:
+        """Elimina un bovino"""
+        try:
+            # Verificar permisos
+            bovino_actual = await self.get_bovino_by_id(bovino_id, propietario_id)
+            if not bovino_actual:
+                raise Exception("Bovino no encontrado o sin permisos")
+            
+            response = self.db.table('bovinos').delete().eq('id', bovino_id).execute()
+            
+            return len(response.data) > 0
+            
+        except Exception as e:
+            raise Exception(f"Error eliminando bovino: {str(e)}")
     
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
-        )
-
-@router.get("/search/by-id", response_model=List[BovinoResponse])
-async def search_bovinos_by_id(
-    id_bovino: str = Query(..., description="ID del bovino (placa/arete) a buscar"),
-    current_user_id: str = Depends(get_current_user_id)
-):
-    """
-    Busca bovinos por ID de bovino (placa/arete)
-    """
-    try:
-        bovinos = await bovino_service.search_bovinos_by_id(id_bovino, current_user_id)
-        return bovinos
+    async def get_bovino_with_mediciones(self, bovino_id: str, propietario_id: str) -> Optional[Dict[str, Any]]:
+        """Obtiene un bovino con sus mediciones"""
+        try:
+            # Obtener bovino
+            bovino = await self.get_bovino_by_id(bovino_id, propietario_id)
+            
+            if not bovino:
+                return None
+            
+            # Obtener mediciones del bovino
+            mediciones_response = self.db.table('mediciones_bovinos').select('*').eq('bovino_id', bovino_id).order('fecha', desc=True).execute()
+            
+            bovino['mediciones'] = mediciones_response.data if mediciones_response.data else []
+            
+            return bovino
+            
+        except Exception as e:
+            raise Exception(f"Error obteniendo bovino con mediciones: {str(e)}")
     
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
-        )
+    async def search_bovinos_by_id(self, id_bovino: str, propietario_id: str) -> List[Dict[str, Any]]:
+        """Busca bovinos por ID de bovino (placa/arete)"""
+        try:
+            response = self.db.table('bovinos').select('*, fincas!inner(propietario_id)').ilike('id_bovino', f'%{id_bovino}%').execute()
+            
+            # Filtrar por propietario
+            bovinos = [bovino for bovino in response.data if bovino['fincas']['propietario_id'] == propietario_id]
+            
+            return bovinos
+            
+        except Exception as e:
+            raise Exception(f"Error buscando bovinos: {str(e)}")
+
+# Instancia global del controlador
+bovino_controller = BovinoController()

@@ -7,10 +7,10 @@ Verifica que los modelos de datos funcionen correctamente.
 import pytest
 import uuid
 from datetime import datetime
-from app.models.auth import PerfilCreate, PerfilResponse, UserRegister, UserLogin
-from app.models.finca import FincaCreate, FincaResponse
-from app.models.bovino import BovinoCreate, BovinoResponse
-from app.models.medicion import MedicionCreate, MedicionResponse
+from app.models.auth_models import PerfilCreate, PerfilResponse, UserRegister, UserLogin
+from app.models.finca_models import FincaCreate, FincaResponse
+from app.models.bovino_models import BovinoCreate, BovinoResponse
+from app.models.medicion_models import MedicionCreate, MedicionResponse
 
 
 @pytest.mark.unit
@@ -62,13 +62,13 @@ class TestBovinoModels:
         """Test de creación de bovino válido"""
         bovino_data = {
             "id_bovino": "COW001",
-            "sexo": "M",
+            "sexo": "Macho",
             "raza": "Holstein",
             "finca_id": str(uuid.uuid4())
         }
         bovino = BovinoCreate(**bovino_data)
         assert bovino.id_bovino == "COW001"
-        assert bovino.sexo == "M"
+        assert bovino.sexo == "Macho"
         assert bovino.raza == "Holstein"
     
     def test_bovino_invalid_sex(self):

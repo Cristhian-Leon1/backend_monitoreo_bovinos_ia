@@ -1,6 +1,6 @@
 from fastapi import HTTPException, status, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from app.services.auth_service import auth_service
+from app.controllers.auth_controller import auth_controller
 from typing import Optional, Dict, Any
 import uuid
 
@@ -12,7 +12,7 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     """
     try:
         token = credentials.credentials
-        user = await auth_service.verify_token(token)
+        user = await auth_controller.verify_token(token)
         
         if not user:
             raise HTTPException(
@@ -70,7 +70,7 @@ class AuthMiddleware:
         
         try:
             token = credentials.credentials
-            user = await auth_service.verify_token(token)
+            user = await auth_controller.verify_token(token)
             return user
         except:
             return None
