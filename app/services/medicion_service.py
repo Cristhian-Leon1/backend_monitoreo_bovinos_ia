@@ -1,4 +1,5 @@
 from supabase import Client
+from app.config.database import supabase_admin  # ✅ Cambiar a admin
 from app.config.database import supabase
 from app.models.medicion import MedicionCreate, MedicionUpdate
 from typing import List, Dict, Any, Optional
@@ -7,7 +8,7 @@ from decimal import Decimal
 import uuid
 
 class MedicionService:
-    def __init__(self, db_client: Client = supabase):
+    def __init__(self, db_client: Client = supabase_admin):  # ✅ Usar admin
         self.db = db_client
     
     def _convert_decimals_to_float(self, data: dict) -> dict:

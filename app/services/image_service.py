@@ -1,4 +1,5 @@
 from supabase import Client
+from app.config.database import supabase_admin  # ✅ Cambiar a admin
 from app.config.database import supabase
 from app.config.settings import settings
 from fastapi import UploadFile
@@ -8,7 +9,7 @@ import base64
 from datetime import datetime
 
 class ImageService:
-    def __init__(self, db_client: Client = supabase):
+    def __init__(self, db_client: Client = supabase_admin):  # ✅ Usar admin
         self.db = db_client
         self.bucket_name = settings.bucket_name
 

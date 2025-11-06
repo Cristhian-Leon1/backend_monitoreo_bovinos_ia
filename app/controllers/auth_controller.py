@@ -1,7 +1,8 @@
 from fastapi import APIRouter, HTTPException, status, Depends
 from app.models.auth import UserRegister, UserLogin, TokenResponse, PerfilUpdate, PerfilResponse
 from app.services.auth_service import auth_service
-from app.middleware.auth import get_current_user, get_current_user_id
+from fastapi.security import HTTPAuthorizationCredentials  # 👈 Añade esto
+from app.middleware.auth import get_current_user, get_current_user_id, security  # Añadir security
 from typing import Dict, Any
 
 router = APIRouter(prefix="/auth", tags=["Autenticación"])
@@ -62,14 +63,12 @@ async def login(user_data: UserLogin):
         )
 
 @router.post("/logout")
-async def logout(current_user: Dict[str, Any] = Depends(get_current_user)):
-    """
-    Cierra la sesión del usuario actual
-    """
+async def logout(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """Cierra la sesión del usuario actual"""
     try:
-        await auth_service.logout_user("")
+        token = credentials.credentials  # Obtener el token real
+        await auth_service.logout_user(token)
         return {"message": "Sesión cerrada exitosamente"}
-    
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

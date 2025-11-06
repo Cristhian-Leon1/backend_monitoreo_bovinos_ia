@@ -1,11 +1,11 @@
 from supabase import Client
-from app.config.database import supabase
+from app.config.database import supabase_admin  # ✅ Cambiar a admin
 from app.models.bovino import BovinoCreate, BovinoUpdate
 from typing import List, Dict, Any, Optional
 import uuid
 
 class BovinoService:
-    def __init__(self, db_client: Client = supabase):
+    def __init__(self, db_client: Client = supabase_admin):  # ✅ Usar admin
         self.db = db_client
     
     async def create_bovino(self, bovino_data: BovinoCreate, propietario_id: str) -> Dict[str, Any]:

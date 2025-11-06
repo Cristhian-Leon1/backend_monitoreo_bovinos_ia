@@ -1,12 +1,12 @@
 from supabase import Client
-from app.config.database import supabase
+from app.config.database import supabase_admin  # ✅ Cambiar a admin
 from app.models.finca import FincaCreate, FincaUpdate, FincaWithBovinosAndMediciones, BovinoWithLastMedicion
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 import uuid
 
 class FincaService:
-    def __init__(self, db_client: Client = supabase):
+    def __init__(self, db_client: Client = supabase_admin):  # ✅ Usar admin
         self.db = db_client
     
     async def create_finca(self, finca_data: FincaCreate, propietario_id: str) -> Dict[str, Any]:

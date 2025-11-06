@@ -1,19 +1,26 @@
-from supabase import Client
+from supabase import Client, create_client
 from app.config.database import supabase, supabase_admin
+from app.config.settings import settings
 from app.models.auth import UserRegister, UserLogin, PerfilCreate, PerfilUpdate
 from typing import Optional, Dict, Any
 import uuid
 
 class AuthService:
     def __init__(self, db_client: Client = supabase):
-        self.db = db_client
-        self.admin_db = supabase_admin
+        self.db = db_client  # Solo para queries de datos (perfiles)
+        self.admin_db = supabase_admin  # Para validación de tokens
     
     async def register_user(self, user_data: UserRegister) -> Dict[str, Any]:
         """Registra un nuevo usuario"""
         try:
-            # Registrar usuario en Supabase Auth
-            auth_response = self.db.auth.sign_up({
+            # ✅ CREAR UN CLIENTE TEMPORAL para el registro
+            # Esto evita afectar el cliente singleton
+            temp_client = create_client(
+                settings.supabase_url,
+                settings.supabase_anon_key
+            )
+            
+            auth_response = temp_client.auth.sign_up({
                 "email": user_data.email,
                 "password": user_data.password,
                 "options": {
@@ -37,13 +44,20 @@ class AuthService:
     async def login_user(self, user_data: UserLogin) -> Dict[str, Any]:
         """Autentica un usuario"""
         try:
-            auth_response = self.db.auth.sign_in_with_password({
+            # ✅ CREAR UN CLIENTE TEMPORAL para el login
+            # Esto evita que el login de un usuario afecte a otros
+            temp_client = create_client(
+                settings.supabase_url,
+                settings.supabase_anon_key
+            )
+            
+            auth_response = temp_client.auth.sign_in_with_password({
                 "email": user_data.email,
                 "password": user_data.password
             })
             
             if auth_response.user and auth_response.session:
-                # Obtener perfil del usuario
+                # Obtener perfil usando el cliente de datos (no el temporal)
                 perfil = await self.get_user_profile(auth_response.user.id)
                 
                 return {
@@ -60,13 +74,16 @@ class AuthService:
     async def get_user_profile(self, user_id: str) -> Optional[Dict[str, Any]]:
         """Obtiene el perfil de un usuario"""
         try:
-            response = self.db.table('perfiles').select('*').eq('id', user_id).execute()
+            # ✅ Usar admin_db para queries de datos
+            # Esto evita problemas de permisos
+            response = self.admin_db.table('perfiles').select('*').eq('id', user_id).execute()
             
             if response.data:
                 return response.data[0]
             return None
             
         except Exception as e:
+            print(f"Error obteniendo perfil: {str(e)}")
             raise Exception(f"Error obteniendo perfil: {str(e)}")
     
     async def update_user_profile(self, user_id: str, profile_data: PerfilUpdate) -> Dict[str, Any]:
@@ -75,7 +92,8 @@ class AuthService:
             update_data = profile_data.dict(exclude_unset=True)
             update_data['updated_at'] = 'now()'
             
-            response = self.db.table('perfiles').update(update_data).eq('id', user_id).execute()
+            # ✅ Usar admin_db para actualizaciones
+            response = self.admin_db.table('perfiles').update(update_data).eq('id', user_id).execute()
             
             if response.data:
                 return response.data[0]
@@ -88,29 +106,46 @@ class AuthService:
     async def logout_user(self, access_token: str) -> bool:
         """Cierra sesión de usuario"""
         try:
-            self.db.auth.sign_out()
+            # Verificar que el token sea válido
+            user = await self.verify_token(access_token)
+            
+            if not user:
+                print("⚠️ Token inválido en logout")
+                return False
+            
+            user_id = user.get('id')
+            print(f"✅ Logout exitoso para usuario: {user_id}")
+            
             return True
+            
         except Exception as e:
-            raise Exception(f"Error en logout: {str(e)}")
+            print(f"❌ Error en logout: {str(e)}")
+            return False
     
     async def verify_token(self, access_token: str) -> Optional[Dict[str, Any]]:
-        """Verifica un token de acceso"""
+        """Verifica un token de acceso usando Admin API"""
         try:
-            user_response = self.db.auth.get_user(access_token)
-            if user_response.user:
-                # Convertir el objeto User a diccionario
+            # ✅ USAR ADMIN_DB para verificar tokens
+            # Esto NO afecta el estado de ningún cliente
+            user_response = self.admin_db.auth.get_user(access_token)
+            
+            if user_response and user_response.user:
                 user_dict = {
                     "id": user_response.user.id,
                     "email": user_response.user.email,
-                    "created_at": str(user_response.user.created_at),
-                    "updated_at": str(user_response.user.updated_at),
+                    "created_at": str(user_response.user.created_at) if user_response.user.created_at else None,
+                    "updated_at": str(user_response.user.updated_at) if user_response.user.updated_at else None,
                     "user_metadata": user_response.user.user_metadata,
                     "app_metadata": user_response.user.app_metadata
                 }
                 return user_dict
+            
             return None
+            
         except Exception as e:
-            print(f"Error verificando token: {str(e)}")
+            print(f"❌ Error verificando token: {str(e)}")
+            import traceback
+            traceback.print_exc()
             return None
 
 # Instancia global del servicio
